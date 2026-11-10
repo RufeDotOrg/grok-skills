@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Slice file tool: get/put/clear/at fixed-size source slots (size: SLOT). See SKILL.md."""
+import ctypes
 import mmap
 import os
 import re
@@ -21,25 +22,25 @@ def save_index(path, names):
 
 
 def slots_of(names, name):
+    try:
+        i = names.index(name)
+    except ValueError:
+        return -1, 0
     n = len(names)
-    i = 0
-    while i < n:
-        if names[i] == name:
-            k = i + 1
-            while k < n and names[k] == name:
-                k += 1
-            return i, k - i
-        i += 1
-    return -1, 0
+    k = i + 1
+    while k < n and names[k] == name:
+        k += 1
+    return i, k - i
 
 
 def first_empty(names, need):
     n = len(names)
     i = 0
     while i < n:
-        if names[i] != "":
-            i += 1
-            continue
+        try:
+            i = names.index("", i)
+        except ValueError:
+            return -1
         k = i + 1
         while k < n and names[k] == "":
             k += 1
@@ -49,10 +50,17 @@ def first_empty(names, need):
     return -1
 
 
+def fill(mm, off, size):
+    # memset the mmap to PAD; drop the buffer view so mm can resize/close
+    view = ctypes.c_char.from_buffer(mm, off)
+    ctypes.memset(ctypes.addressof(view), PAD[0], size)
+    del view
+
+
 def double_memory(names, mm):
     n = len(names)
     mm.resize(n * 2 * SLOT)
-    mm[n * SLOT :] = PAD * (n * SLOT)   # bulk memset to 0x20
+    fill(mm, n * SLOT, n * SLOT)
     names.extend([""] * n)
 
 
@@ -167,12 +175,11 @@ elif cmd == "get":
 elif cmd == "put":
     body = sys.stdin.buffer.read()
     validate(SOURCE, name, body)
-    before = list(names)
+    grew = len(names)
     packed = pack(body)
     need = len(packed) // SLOT
     if at >= 0:
-        for k in range(count):
-            names[at + k] = ""
+        names[at : at + count] = [""] * count
     else:
         count = 0
         at = 0
@@ -180,31 +187,28 @@ elif cmd == "put":
     while dest < 0:
         double_memory(names, mm)
         dest = first_empty(names, need)
-    for k in range(need):
-        names[dest + k] = name
+    names[dest : dest + need] = [name] * need
     if count:
-        for k in range(count):
-            mm[(at + k) * SLOT : (at + k + 1) * SLOT] = empty_slot
+        fill(mm, at * SLOT, count * SLOT)
     mm[dest * SLOT : (dest + need) * SLOT] = packed
     mm.flush()
     save_index(INDEX, names)
     # index patch: =<total lines> on growth, -<line> <name> emptied, +<line> <name> filled
     out = []
-    if len(names) != len(before):
+    if len(names) != grew:
         out.append("=%d\n" % len(names))
-    for i in range(len(before)):
-        if before[i] and before[i] != names[i]:
-            out.append("-%d %s\n" % (i, before[i]))
-    for i in range(len(names)):
-        if names[i] and (i >= len(before) or before[i] != names[i]):
-            out.append("+%d %s\n" % (i, names[i]))
+    for i in range(at, at + count):
+        if not dest <= i < dest + need:
+            out.append("-%d %s\n" % (i, name))
+    for i in range(dest, dest + need):
+        if not at <= i < at + count:
+            out.append("+%d %s\n" % (i, name))
     sys.stdout.write("".join(out))
 elif cmd == "clear":
     if at < 0:
         sys.exit(1)
-    for k in range(count):
-        names[at + k] = ""
-        mm[(at + k) * SLOT : (at + k + 1) * SLOT] = empty_slot
+    names[at : at + count] = [""] * count
+    fill(mm, at * SLOT, count * SLOT)
     mm.flush()
     save_index(INDEX, names)
     sys.stdout.write("".join("-%d %s\n" % (at + k, name) for k in range(count)))
