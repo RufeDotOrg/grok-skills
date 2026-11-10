@@ -7,4 +7,4 @@ main()
   return 0;
 }
 
-#include "demo.slicefn.c"
+#include "demo.slicefn"

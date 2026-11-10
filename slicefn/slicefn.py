@@ -73,11 +73,11 @@ def unpack(raw):
 
 
 def pair_paths(path):
-    """foo.slicefn.c -> (foo.slicefn.c, foo.sliceindex). The target names the language."""
-    if ".slicefn." not in path:
+    """foo.slicefn -> (foo.slicefn, foo.sliceindex)."""
+    if not path.endswith(".slicefn"):
         sys.stderr.write("not a slicefn file: %s\n" % path)
         sys.exit(1)
-    return path, path.rsplit(".slicefn.", 1)[0] + ".sliceindex"
+    return path, path[:-len(".slicefn")] + ".sliceindex"
 
 
 # ---- per-extension validation (C is the only entry) ----
@@ -112,19 +112,16 @@ def validate(source, name, body):
 # ---- CLI ----
 
 def usage():
-    sys.stderr.write("usage: slicefn.py [--ruffc] <file.slicefn.ext> get|put|clear <name>\n       slicefn.py <file.slicefn.ext> at < offsets\n")
+    sys.stderr.write("usage: slicefn.py [--ruffc] <file.slicefn> get|put|clear <name>\n       slicefn.py <file.slicefn> at < offsets\n")
     sys.exit(1)
 
 
-# --ruffc (default off): Ruff-C checks on put; target must be .slicefn.c
+# --ruffc (default off): Ruff-C checks on put
 RUFFC = "--ruffc" in sys.argv
 sys.argv = [a for a in sys.argv if a != "--ruffc"]
 if len(sys.argv) < 3:
     usage()
 SOURCE, INDEX = pair_paths(sys.argv[1])
-if RUFFC and not SOURCE.endswith(".slicefn.c"):
-    sys.stderr.write("slicefn: --ruffc needs a .slicefn.c target\n")
-    sys.exit(1)
 cmd = sys.argv[2]
 
 if cmd == "at":

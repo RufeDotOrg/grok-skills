@@ -1,4 +1,13 @@
-demo.slicefn.*
+demo.slicefn
 demo.sliceindex
 slicefn/c/demo
 __pycache__/
+slicefn/bench/*.slicefn
+slicefn/bench/*.sliceindex
+slicefn/bench/bench-bin
+slicefn/bench/results.txt
+slicefn/bench/bench.log
+slicefn/jai/main
+slicefn/jai/.build/
+slicefn/bench/bench.err
+slicefn/bench/.build/

@@ -10,16 +10,16 @@ description: >
 
   Storage: file pair on disk
 - **read-only** access to `<name>.sliceindex` - newline delimited list of functions
-- **tool-only** access to `<name>.slicefn.<ext>` - do not put the whole file into your context; prefer `grep -bo` or slicefn.py operations
+- **tool-only** access to `<name>.slicefn` - do not put the whole file into your context; prefer `grep -bo` or slicefn.py operations
 
   Tool Command: slicefn.py [--ruffc] <filename> <operation>
-- Filename: path to the `.slicefn.*`
+- Filename: path to the `.slicefn`
 - Operations:
   `get <function>` - output the function definition stripped of header, footer, and padding
   `clear <function>` - replace a function definition with empty blocks; prints patch style output for the index
   `put <function>` - clear a function definition, then add the stdin function definition; returns patch style output for the index, as it may change
   `at` - each stdin line starts with a byte offset; the rest is ignored. output is a function name per input line
-- Ext: language of function definitions, suitable for direct submission to a compiler
+- `.slicefn` is the only suffix, regardless of language
 - Halt on any non-zero return value
 - **Confirm with the user before a put operation that would create a file**
 
@@ -34,7 +34,7 @@ Functions are embedded into contiguous fixed-size binary blocks. Each block maps
 
 ## Growth (implementation detail of `put`)
 
-- `*.slicefn.*`: Growth doubles the binary blob, bulk memset to ascii space (0x20)
+- `*.slicefn`: Growth doubles the binary blob, bulk memset to ascii space (0x20)
 - `*.sliceindex`: Growth means the line count doubles, append newline bytes (0x0A)
 
 ## `.sliceindex` file
@@ -75,7 +75,6 @@ This returns one name per match, so duplicates are expected. An offset in an emp
 ## Ruff-C Validation (`put` only)
 
 - use `slicefn.py --ruffc` when the project's AGENTS.md opts in
-- a target not ending in `.slicefn.c` returns non-zero
 
 Checks:
 - body contains `<function>(`
