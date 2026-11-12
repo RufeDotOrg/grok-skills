@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slice file tool: get/put/clear/at fixed-size source slots (size: SLOT). See SKILL.md."""
+"""Slice file tool: get/put/clear/at/search fixed-size source slots (size: SLOT). See SKILL.md."""
 import ctypes
 import mmap
 import os
@@ -120,7 +120,11 @@ def validate(source, name, body):
 # ---- CLI ----
 
 def usage():
-    sys.stderr.write("usage: slicefn.py [--ruffc] <file.slicefn> get|put|clear <name>\n       slicefn.py <file.slicefn> at < offsets\n")
+    sys.stderr.write(
+        "usage: slicefn.py [--ruffc] <file.slicefn> get|put|clear <name>\n"
+        "       slicefn.py [--ruffc] <file.slicefn> search <pattern>\n"
+        "       slicefn.py <file.slicefn> at < offsets\n"
+    )
     sys.exit(1)
 
 
@@ -212,6 +216,31 @@ elif cmd == "clear":
     mm.flush()
     save_index(INDEX, names)
     sys.stdout.write("".join("-%d %s\n" % (at + k, name) for k in range(count)))
+elif cmd == "search":
+    # literal one-pass find on the mmap; on a hit, write the unpacked definition
+    # and resume at the next bucket after that function
+    pat = name.encode()
+    if not pat:
+        sys.stderr.write("search: empty pattern\n")
+        sys.exit(1)
+    i, nslots, nbytes = 0, len(names), len(mm)
+    while i < nbytes:
+        off = mm.find(pat, i)
+        if off < 0:
+            break
+        slot = off // SLOT
+        fn = names[slot]
+        if not fn:
+            i = (slot + 1) * SLOT
+            continue
+        start = slot
+        while start > 0 and names[start - 1] == fn:
+            start -= 1
+        end = slot + 1
+        while end < nslots and names[end] == fn:
+            end += 1
+        sys.stdout.buffer.write(unpack(mm[start * SLOT : end * SLOT]))
+        i = end * SLOT
 else:
     usage()
 mm.close()
